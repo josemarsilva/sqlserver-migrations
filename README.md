@@ -1,9 +1,8 @@
 ### sqlserver-migrations
-SQLServer Migrations is a tool do manage upgrades & downgrades scripts on a Microsoft SQLServer Databases.
 
 ## 1. Introduction
 
-This is source code and run-time repository of tool **sqlserver-migrations**.
+The project **sqlserver-migrations** is a tool do manage upgrades & downgrades scripts on a Microsoft SQLServer Databases.
 
 
 ### 2. Documentation

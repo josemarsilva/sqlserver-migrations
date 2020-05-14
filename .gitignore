@@ -1,6 +1,8 @@
 # User Custom - Not Git
+.sqlserver-migrations
 *.tmp
 *.log
+
 
 # Ignore Microsoft Office temporary files
 ~$*.xls*
