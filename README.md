@@ -1,5 +1,5 @@
 ### sqlserver-migrations
-SQLServer Migrations is a tool do manage upgrades, downgrades, deployment and undeployment SQL Scripts on a Microsoft SQLServer Databases.
+SQLServer Migrations is a tool do manage upgrades & downgrades scripts on a Microsoft SQLServer Databases.
 
 ## 1. Introduction
 
