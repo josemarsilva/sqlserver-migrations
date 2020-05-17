@@ -14,7 +14,7 @@
 # #############################################################################
 # initializing ...
 # #############################################################################
-$release = "v.2020.05.17.0125"
+$release = "v.2020.05.17.0213"
 $argCmd = $args[0]
 $argCmdArg1 = $args[1]
 $argCmdArg2 = $args[2]
@@ -88,10 +88,22 @@ Function Command-List
     } elseif ($argCmdArg1.ToLower() -eq "--downgrade") {
         Write-Host( "list --downgrade" )
     } elseif ($argCmdArg1.ToLower() -eq "--setup") {
-        $objConfigKeyValue
+		Write-Host( "" )
+		Write-Host( "key             value" )
+		Write-Host( "--------------- --------------------------------------------------" )
+		Write-Host( "sqlcmdPath      " + $sqlcmdPath )
+		Write-Host( "servername      " + $servername )
+		Write-Host( "protocol        " + $protocol )
+		Write-Host( "port            " + $port )
+		Write-Host( "login           " + $login )
+		Write-Host( "password        " + $password )
+		Write-Host( "database        " + $database )
+		Write-Host( "prefixUpgrade   " + $prefixUpgrade )
+		Write-Host( "prefixDowngrade " + $prefixDowngrade ) 
     } else {
         Write-Host( "" )
-        Write-Host( "ERROR: Command argument is missing or invalid! Try 'sqlserver-migrations list ' ( '--upgrade' | '--downgrade' |  '--setup' )" )
+        Write-Host( "ERROR: Command argument is missing or invalid!" )
+		Write-Host( "       Try 'sqlserver-migrations list ' ( '--upgrade' | '--downgrade' |  '--setup' )" )
         Write-Host( "" )
         exit 1 # error
     }
@@ -123,7 +135,8 @@ Function Command-Setup
         # check configuration sub-folder and file ...
         if ( -Not (Test-path ($configRepositoryPath + "\" + $configKeyValueCsvFile) -PathType Leaf) ) {
             Write-Host( "" )
-            Write-Host( "ERROR: sqlserver-migrations NOT installed yet! Try 'sqlserver-migrations install'" )
+            Write-Host( "ERROR: sqlserver-migrations NOT installed yet!" )
+			Write-Host( "       Try 'sqlserver-migrations install'" )
             Write-Host( "" )
             exit 1 # error
         }
@@ -148,7 +161,8 @@ Function Command-Setup
             $prefixDowngrade = $argCmdArg2
         } else {
             Write-Host( "" )
-            Write-Host( "ERROR: Command argument is missing or invalid! Try 'sqlserver-migrations setup ' ( sqlcmd-path | servername | protocol | port | login | password | database | prefix-upgrade | prefix-downgrade )" )
+            Write-Host( "ERROR: Command argument is missing or invalid!" )
+			Write-Host( "       Try 'sqlserver-migrations setup ' ( sqlcmd-path | servername | protocol | port | login | password | database | prefix-upgrade | prefix-downgrade )" )
             Write-Host( "" )
             exit 1 # error
         }
@@ -165,12 +179,14 @@ Function Command-Setup
         ( "prefix-downgrade" + ";" + $prefixDowngrade + ";" + ""    ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
         # done
         Write-Host( "" )
-        Write-Host( "SUCCESS: sqlserver-migrations (key/value) setup! Try 'sqlserver-migrations list setup' " )
+        Write-Host( "SUCCESS: sqlserver-migrations (key/value) setup!" )
+		Write-Host( "         Try 'sqlserver-migrations list setup' " )
         Write-Host( "" )
 
     } else {
         Write-Host( "" )
-        Write-Host( "ERROR: Command argument is missing or invalid! Try sqlserver-migrations setup <key> [ <value> ] " )
+        Write-Host( "ERROR: Command argument is missing or invalid!" )
+		Write-Host( "       Try sqlserver-migrations setup <key> [ <value> ]" )
         Write-Host( "" )
         exit 1 # error
     }
@@ -184,7 +200,8 @@ Function Command-Install
     # check configuration sub-folder and file ...
     if ( Test-path ($configRepositoryPath + "\" + $configKeyValueCsvFile) -PathType Leaf ) {
         Write-Host( "" )
-        Write-Host( "ERROR: sqlserver-migrations IS ALREADY installed! Try 'sqlserver-migrations list --setup'" )
+        Write-Host( "ERROR: sqlserver-migrations IS ALREADY installed!" )
+		Write-Host( "       Try 'sqlserver-migrations list --setup' " )
         Write-Host( "" )
         exit 1 # error
     }
@@ -193,16 +210,16 @@ Function Command-Install
         New-Item -ItemType Directory -Force -Path $configRepositoryPath | Out-Null
     }
     # create installation file ...
-    ( "key" + ";" + "value" + ";" + "obs") | Out-File         ($configRepositoryPath + "\" + $configKeyValueCsvFile)
-    ( "sqlcmd-path"      + ";" + $sqlcmdPath      + ";" + "") | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
-    ( "servername"       + ";" + $servername      + ";" + "") | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
-    ( "protocol"         + ";" + $protocol        + ";" + "") | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
-    ( "port"             + ";" + $port            + ";" + "") | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
-    ( "login"            + ";" + $login           + ";" + "") | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
-    ( "password"         + ";" + $password        + ";" + "") | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
-    ( "database"         + ";" + $database        + ";" + "") | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
-    ( "prefix-upgrade"   + ";" + $prefixUpgrade   + ";" + "") | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
-    ( "prefix-downgrade" + ";" + $prefixDowngrade + ";" + "") | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+    ( "key"              + ";" + "value"       + ";" + "obs") | Out-File         ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+    ( "sqlcmd-path"      + ";" + ""            + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+    ( "servername"       + ";" + "localhost"   + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+    ( "protocol"         + ";" + ""            + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+    ( "port"             + ";" + ""            + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+    ( "login"            + ";" + "user"        + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+    ( "password"         + ";" + "password123" + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+    ( "database"         + ";" + "master"      + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+    ( "prefix-upgrade"   + ";" + "upgrade-"    + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+    ( "prefix-downgrade" + ";" + "downgrade-"  + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
     Write-Host( "" )
     Write-Host( "SUCCESS: sqlserver-migrations installed!" )
     Write-Host( "" )
@@ -226,7 +243,8 @@ if ($argCmd.ToLower() -eq "-h" -or $argCmd.ToLower() -eq "help") {
     Command-Install
 } else {
     Write-Host( "" )
-    Write-Host( "ERROR: Command argument is missing! Try help 'sqlserver-migrations -h'" )
+    Write-Host( "ERROR: Command argument is missing!" )
+	Write-Host( "       Try help 'sqlserver-migrations -h' ")
     Write-Host( "" )
     exit 1 # error
 }
