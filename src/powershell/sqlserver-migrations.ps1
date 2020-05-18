@@ -78,28 +78,88 @@ Function Command-Help
 }
 
 # #############################################################################
+# Function Check-Config()
+# #############################################################################
+Function Check-Config
+{
+    # check configuration sub-folder and file ...
+    if ( -Not (Test-path ($configRepositoryPath + "\" + $configKeyValueCsvFile) -PathType Leaf) ) {
+        Write-Host( "" )
+        Write-Host( "ERROR: sqlserver-migrations NOT installed yet!" )
+		Write-Host( "       Try 'sqlserver-migrations install'" )
+        Write-Host( "" )
+        exit 1 # error
+    }
+    # check configuration prefixUpgrade ...
+    if ($servername -eq "") {
+        Write-Host( "" )
+        Write-Host( "ERROR: sqlserver-migrations setup configuration key value 'servername' can *NOT* be empty!" )
+		Write-Host( "       Try 'sqlserver-migrations list --setup' " )
+		Write-Host( "       Try 'sqlserver-migrations setup servername <put-value-here>' " )
+        Write-Host( "" )
+        exit 1 # error
+    } elseif  ($login -eq "") {
+        Write-Host( "" )
+        Write-Host( "ERROR: sqlserver-migrations setup configuration key value 'login' can *NOT* be empty!" )
+		Write-Host( "       Try 'sqlserver-migrations list --setup' " )
+		Write-Host( "       Try 'sqlserver-migrations setup login <put-value-here>' " )
+        Write-Host( "" )
+        exit 1 # error
+    } elseif  ($password -eq "") {
+        Write-Host( "" )
+        Write-Host( "ERROR: sqlserver-migrations setup configuration key value 'password' can *NOT* be empty!" )
+		Write-Host( "       Try 'sqlserver-migrations list --setup' " )
+		Write-Host( "       Try 'sqlserver-migrations setup password <put-value-here>' " )
+        Write-Host( "" )
+        exit 1 # error
+    } elseif  ($database -eq "") {
+        Write-Host( "" )
+        Write-Host( "ERROR: sqlserver-migrations setup configuration key value 'database' can *NOT* be empty!" )
+		Write-Host( "       Try 'sqlserver-migrations list --setup' " )
+		Write-Host( "       Try 'sqlserver-migrations setup database <put-value-here>' " )
+        Write-Host( "" )
+        exit 1 # error
+    } elseif  ($prefixUpgrade -eq "") {
+        Write-Host( "" )
+        Write-Host( "ERROR: sqlserver-migrations setup configuration key value 'prefix-upgrade' can *NOT* be empty!" )
+		Write-Host( "       Try 'sqlserver-migrations list --setup' " )
+		Write-Host( "       Try 'sqlserver-migrations setup prefix-upgrade <put-value-here>' " )
+        Write-Host( "" )
+        exit 1 # error
+    } elseif ($prefixDowngrade -eq "") {
+        Write-Host( "" )
+        Write-Host( "ERROR: sqlserver-migrations setup configuration key value 'prefix-downgrade' can *NOT* be empty!" )
+		Write-Host( "       Try 'sqlserver-migrations list --setup' " )
+		Write-Host( "       Try 'sqlserver-migrations setup prefix-downgrade <put-value-here>' " )
+        Write-Host( "" )
+        exit 1 # error
+    }
+}
+
+# #############################################################################
 # Function Command-List()
 # #############################################################################
 Function Command-List
 {
     # check command arguments ...
     if ($argCmdArg1.ToLower() -eq "--upgrade") {
-        Write-Host( "list --upgrade" )
+        # check config ...
+        Check-Config
+        # list --upgrade
+        Write-Host( "list --downgrade" )
     } elseif ($argCmdArg1.ToLower() -eq "--downgrade") {
+        # check config ...
+        Check-Config
+        # list --downgrade
         Write-Host( "list --downgrade" )
     } elseif ($argCmdArg1.ToLower() -eq "--setup") {
+        # Import-Csv
 		Write-Host( "" )
-		Write-Host( "key             value" )
-		Write-Host( "--------------- --------------------------------------------------" )
-		Write-Host( "sqlcmdPath      " + $sqlcmdPath )
-		Write-Host( "servername      " + $servername )
-		Write-Host( "protocol        " + $protocol )
-		Write-Host( "port            " + $port )
-		Write-Host( "login           " + $login )
-		Write-Host( "password        " + $password )
-		Write-Host( "database        " + $database )
-		Write-Host( "prefixUpgrade   " + $prefixUpgrade )
-		Write-Host( "prefixDowngrade " + $prefixDowngrade ) 
+		Write-Host( "key                  value                                              obs" )
+		Write-Host( "-------------------- -------------------------------------------------- ------------------------" )
+        $objConfigKeyValue | ForEach-Object {
+    		Write-Host( ($_.key + "                    ").substring(0,19) + "  " + ($_.value + "                                                  ").substring(0,49) + " " + $_.obs  )
+        }
     } else {
         Write-Host( "" )
         Write-Host( "ERROR: Command argument is missing or invalid!" )
@@ -114,6 +174,7 @@ Function Command-List
 # #############################################################################
 Function Command-Upgrade
 {
+    Check-Config
     Write-Host( "Upgrade" )
 }
 
@@ -122,6 +183,7 @@ Function Command-Upgrade
 # #############################################################################
 Function Command-Downgrade
 {
+    Check-Config
     Write-Host( "Downgrade" )
 }
 
