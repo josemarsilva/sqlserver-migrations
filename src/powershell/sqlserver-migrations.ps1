@@ -175,7 +175,12 @@ Function Command-List
 Function Command-Upgrade
 {
     Check-Config
-    Write-Host( "Upgrade" )
+    Write-Host( "" )
+    Get-ChildItem -Path . -Filter ($prefixUpgrade + "*")  | Where-Object { $_.Name -Like '*.sql' -or $_.Name -Like '*.bat' } | Sort-Object -Property Name | ForEach-Object {
+        # Iterator
+        $sqlScriptName = $_.Name
+        Write-Host( $sqlScriptName )
+    }
 }
 
 # #############################################################################
@@ -184,7 +189,12 @@ Function Command-Upgrade
 Function Command-Downgrade
 {
     Check-Config
-    Write-Host( "Downgrade" )
+    Write-Host( "" )
+    Get-ChildItem -Path . -Filter ($prefixDowngrade + "*")  | Where-Object { $_.Name -Like '*.sql' -or $_.Name -Like '*.bat' } | Sort-Object -Property Name | ForEach-Object {
+        # Iterator
+        $sqlScriptName = $_.Name
+        Write-Host( $sqlScriptName )
+    }
 }
 
 # #############################################################################
