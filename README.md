@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-The **sqlserver-migrations** is a usefull tool to manage scripts of upgrade and downgrades on SQLServer databases.
+The **sqlserver-migrations** is a usefull tool to manage scripts of upgrade and downgrades on SQLServer databases in a **Continuous Deployment** environment.
 
 
 ### 2. Documentation
