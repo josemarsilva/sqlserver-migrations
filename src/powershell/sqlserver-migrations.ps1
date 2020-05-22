@@ -14,7 +14,7 @@
 # #############################################################################
 # initializing ...
 # #############################################################################
-$release = "v.2020.05.17.0213"
+$release = "v.2020.05.22.1958"
 $argCmd = $args[0]
 $argCmdArg1 = $args[1]
 $argCmdArg2 = $args[2]
@@ -25,6 +25,7 @@ if ($argCmdArg2 -eq $null) { $argCmdArg2 = "" }
 if ($argCmdArg3 -eq $null) { $argCmdArg3 = "" }
 $configRepositoryPath = ".sqlserver-migrations"
 $configKeyValueCsvFile = "config-key-value.csv"
+$historyFile = "history.csv"
 
 Write-Host( "sqlserver-migrations - $release - SQLServer Database Management Tool for upgrades and downgrades scripts" )
 
@@ -55,6 +56,11 @@ if ( Test-path ($configRepositoryPath + "\" + $configKeyValueCsvFile) ) {
     $prefixUpgrade   = ( $objConfigKeyValue | Where-Object key -eq "prefix-upgrade"    | Select-Object value )[0].value
     $prefixDowngrade = ( $objConfigKeyValue | Where-Object key -eq "prefix-downgrade"  | Select-Object value )[0].value
 }
+# get history of upgrade and downgrade ...
+if ( Test-path ($configRepositoryPath + "\" + $historyFile) ) {
+    # Import-Csv
+    $objHistory = Import-Csv ($configRepositoryPath + "\" + $historyFile) -Delimiter ";"
+}
 
 # #############################################################################
 # Function Command-Help()
@@ -65,9 +71,10 @@ Function Command-Help
     Write-Host( "" )
     Write-Host( "       -h help      Show usefull command line help" )
     Write-Host( "       -l list      List command arguments and parameters" )
-    Write-Host( "                    --upgrade   List only upgrade scripts" )
-    Write-Host( "                    --downgrade List only downgrade scripts" )
-    Write-Host( "                    --setup     List only setup configuration values" )
+    Write-Host( "                    --upgrade   List upgrade scripts to be done" )
+    Write-Host( "                    --downgrade List downgrade scripts to be done" )
+    Write-Host( "                    --history   List downgrade and upgrade already done" )
+    Write-Host( "                    --setup     List setup configuration values" )
     Write-Host( "       -u upgrade   Upgrade script's executions" )
     Write-Host( "       -d downgrade Downgrade script's executions" )
     Write-Host( "       -s setup     Setup current installation key/values with arguments and parameters" )
@@ -86,7 +93,17 @@ Function Check-Config
     if ( -Not (Test-path ($configRepositoryPath + "\" + $configKeyValueCsvFile) -PathType Leaf) ) {
         Write-Host( "" )
         Write-Host( "ERROR: sqlserver-migrations NOT installed yet!" )
-		Write-Host( "       Try 'sqlserver-migrations install'" )
+		Write-Host( "       File '" + ($configRepositoryPath + "\" + $configKeyValueCsvFile) + "' is not present." )
+		Write-Host( "       Try 'sqlserver-migrations install'!" )
+        Write-Host( "" )
+        exit 1 # error
+    }
+    # check history sub-folder and file ...
+    if ( -Not (Test-path ($configRepositoryPath + "\" + $historyFile) -PathType Leaf) ) {
+        Write-Host( "" )
+        Write-Host( "ERROR: sqlserver-migrations NOT installed yet!" )
+		Write-Host( "       File '" + ($configRepositoryPath + "\" + $historyFile) + "' is not present." )
+		Write-Host( "       Try 'sqlserver-migrations install'!" )
         Write-Host( "" )
         exit 1 # error
     }
@@ -145,15 +162,24 @@ Function Command-List
     if ($argCmdArg1.ToLower() -eq "--upgrade") {
         # check config ...
         Check-Config
-        # list --upgrade
-        Write-Host( "list --downgrade" )
+        # List Command-Upgrade
+        Command-Upgrade $True
     } elseif ($argCmdArg1.ToLower() -eq "--downgrade") {
         # check config ...
+        # List Command-Downgrade
+        Command-Downgrade $True
+    } elseif ($argCmdArg1.ToLower() -eq "--history") {
+        # check config ...
         Check-Config
-        # list --downgrade
-        Write-Host( "list --downgrade" )
+        # Import-Csv history
+		Write-Host( "" )
+		Write-Host( "ScriptFilename                                     DateTime             Obs" )
+		Write-Host( "-------------------------------------------------- -------------------- ------------------------" )
+        $objHistory | ForEach-Object {
+    		Write-Host( ($_.ScriptFilename +      "                                                  ").substring(0,49) + "  " + ($_.DateTime + "                    ").substring(0,20) + " " + $_.Obs  )
+        }
     } elseif ($argCmdArg1.ToLower() -eq "--setup") {
-        # Import-Csv
+        # Import-Csv config-key-valye
 		Write-Host( "" )
 		Write-Host( "key                  value                                              obs" )
 		Write-Host( "-------------------- -------------------------------------------------- ------------------------" )
@@ -163,37 +189,75 @@ Function Command-List
     } else {
         Write-Host( "" )
         Write-Host( "ERROR: Command argument is missing or invalid!" )
-		Write-Host( "       Try 'sqlserver-migrations list ' ( '--upgrade' | '--downgrade' |  '--setup' )" )
+		Write-Host( "       Try 'sqlserver-migrations list ' ( '--upgrade' | '--downgrade' | '--history' |  '--setup' )" )
         Write-Host( "" )
         exit 1 # error
     }
 }
 
 # #############################################################################
-# Function Command-Upgrade()
+# Function Execute-Script()
 # #############################################################################
-Function Command-Upgrade
+Function Execute-Script ( $scriptName, $bList )
+{
+    # Extract filename, filetype and logfilename from $scriptName
+    $scriptFileType = ""
+    $scriptLogFilename = $scriptName + ".log"
+    if ($scriptName.Length -gt 4) {
+        $scriptFileType = $scriptName.Substring( $scriptName.Length - 4, 4 )
+        $scriptLogFilename = $scriptName.Substring( 0, $scriptName.Length - 4 ) + ".log"
+    }
+
+    # Script Command Line  ...
+    $scriptCmd = ""
+    if ( $scriptFileType.ToLower() -eq ".sql" ) {
+        $scriptCmd = $sqlcmdPath + "SQLCMD -S " + $protocol + $servername + " -d " + $database + " -U " + $login + " -P " + $password + " -e " + " -i " + $scriptName + " -o " + $scriptLogFilename
+    } elseif ( $scriptFileType.ToLower() -eq ".bat" ) {
+        $scriptCmd = $scriptName + " > " + $scriptLogFilename
+    } else {
+        $scriptCmd = "ECHO ERROR NOT implemented " + $scriptName
+    }
+    Write-Host ( $scriptCmd )
+    if ( -not $bList ) {
+        cmd.exe /c ( $scriptCmd )
+        Get-Content -Path $scriptLogFilename
+        Add-Content ($configRepositoryPath + "\" + $historyFile) ( $scriptName + ";" + (Get-Date).ToString() + ";" )
+
+    }
+
+}
+
+# #############################################################################
+# Function Command-Upgrade( $bList )
+# #############################################################################
+Function Command-Upgrade( $bList )
 {
     Check-Config
     Write-Host( "" )
     Get-ChildItem -Path . -Filter ($prefixUpgrade + "*")  | Where-Object { $_.Name -Like '*.sql' -or $_.Name -Like '*.bat' } | Sort-Object -Property Name | ForEach-Object {
         # Iterator
-        $sqlScriptName = $_.Name
-        Write-Host( $sqlScriptName )
+        $name = $_.Name
+        $count = $objHistory | Where-Object {$_.ScriptFilename -eq $name }
+        if ( $count -eq $null ) {
+            Execute-Script $_.Name $bList
+        }
     }
 }
 
 # #############################################################################
 # Function Command-Downgrade()
 # #############################################################################
-Function Command-Downgrade
+Function Command-Downgrade( $bList )
 {
     Check-Config
     Write-Host( "" )
     Get-ChildItem -Path . -Filter ($prefixDowngrade + "*")  | Where-Object { $_.Name -Like '*.sql' -or $_.Name -Like '*.bat' } | Sort-Object -Property Name | ForEach-Object {
         # Iterator
-        $sqlScriptName = $_.Name
-        Write-Host( $sqlScriptName )
+        $name = $_.Name
+        $count = $objHistory | Where-Object {$_.ScriptFilename -eq $name }
+        if ( $count -eq $null ) {
+            Execute-Script $_.Name $bList
+        }
     }
 }
 
@@ -252,7 +316,7 @@ Function Command-Setup
         # done
         Write-Host( "" )
         Write-Host( "SUCCESS: sqlserver-migrations (key/value) setup!" )
-		Write-Host( "         Try 'sqlserver-migrations list setup' " )
+		Write-Host( "         Try 'sqlserver-migrations list setup for more !' " )
         Write-Host( "" )
 
     } else {
@@ -269,11 +333,21 @@ Function Command-Setup
 # #############################################################################
 Function Command-Install
 {
-    # check configuration sub-folder and file ...
+    # check configuration sub-folder and file ($configRepositoryPath + "\" + $configKeyValueCsvFile) ...
     if ( Test-path ($configRepositoryPath + "\" + $configKeyValueCsvFile) -PathType Leaf ) {
         Write-Host( "" )
         Write-Host( "ERROR: sqlserver-migrations IS ALREADY installed!" )
-		Write-Host( "       Try 'sqlserver-migrations list --setup' " )
+		Write-Host( "       File '" + ($configRepositoryPath + "\" + $configKeyValueCsvFile) + "' is present! " )
+		Write-Host( "       Try 'sqlserver-migrations list --setup' !" )
+        Write-Host( "" )
+        exit 1 # error
+    }
+    # check configuration sub-folder and file ($configRepositoryPath + "\" + $historyFile) ...
+    if ( Test-path ($configRepositoryPath + "\" + $historyFile) -PathType Leaf ) {
+        Write-Host( "" )
+        Write-Host( "ERROR: sqlserver-migrations IS ALREADY installed!" )
+		Write-Host( "       File '" + ($configRepositoryPath + "\" + $historyFile) + "' is present! " )
+		Write-Host( "       Try 'sqlserver-migrations list --setup' !" )
         Write-Host( "" )
         exit 1 # error
     }
@@ -281,7 +355,7 @@ Function Command-Install
     if ( -Not (Test-Path -Path $configRepositoryPath) ) {
         New-Item -ItemType Directory -Force -Path $configRepositoryPath | Out-Null
     }
-    # create installation file ...
+    # create installation file ($configRepositoryPath + "\" + $configKeyValueCsvFile) ...
     ( "key"              + ";" + "value"       + ";" + "obs") | Out-File         ($configRepositoryPath + "\" + $configKeyValueCsvFile)
     ( "sqlcmd-path"      + ";" + ""            + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
     ( "servername"       + ";" + "localhost"   + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
@@ -292,8 +366,12 @@ Function Command-Install
     ( "database"         + ";" + "master"      + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
     ( "prefix-upgrade"   + ";" + "upgrade-"    + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
     ( "prefix-downgrade" + ";" + "downgrade-"  + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+    # create installation file ($configRepositoryPath + "\" + $historyFile) ...
+    ( "ScriptFilename"              + ";" + "DateTime"       + ";" + "obs" + "\n" ) | Out-File         ($configRepositoryPath + "\" + $historyFile)
     Write-Host( "" )
     Write-Host( "SUCCESS: sqlserver-migrations installed!" )
+	Write-Host( "         File '.sqlserver-migrations\config-key-value.csv' created." )
+	Write-Host( "         File '.sqlserver-migrations\history.csv' created." )
     Write-Host( "" )
 }
 
@@ -306,9 +384,9 @@ if ($argCmd.ToLower() -eq "-h" -or $argCmd.ToLower() -eq "help") {
 } elseif ($argCmd.ToLower() -eq "-l" -or $argCmd.ToLower() -eq "list") {
     Command-List
 } elseif ($argCmd.ToLower() -eq "-u" -or $argCmd.ToLower() -eq "upgrade") {
-    Command-Upgrade
+    Command-Upgrade $False
 } elseif ($argCmd.ToLower() -eq "-d" -or $argCmd.ToLower() -eq "downgrade") {
-    Command-Downgrade
+    Command-Downgrade $False
 } elseif ($argCmd.ToLower() -eq "-s" -or $argCmd.ToLower() -eq "setup") {
     Command-Setup
 } elseif ($argCmd.ToLower() -eq "-i" -or $argCmd.ToLower() -eq "install") {

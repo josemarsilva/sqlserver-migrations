@@ -30,20 +30,22 @@ The **sqlserver-migrations** is a usefull tool to manage scripts of upgrade and 
 
 ```bat
 C:\..\sqlserver-migrations\src\powershell> powershell -File sqlserver-migrations.ps1 -h
-sqlserver-migrations - v.2020.05.17.0125 - SQLServer Database Management Tool for upgrades and downgrades scripts
+sqlserver-migrations - v.2020.05.22.1958 - SQLServer Database Management Tool for upgrades and downgrades scripts
 usage: sqlserver-migrations ( [ -h | help ] | [ -l | list ] | [ -u | upgrade ] | [ -d | downgrade ] | [ -s | setup ] | [ -i | install ] ) [ --cmd-args ] [ cmd-params ]
 
        -h help      Show usefull command line help
        -l list      List command arguments and parameters
-                    --upgrade   List only upgrade scripts
-                    --downgrade List only downgrade scripts
-                    --setup     List only setup configuration values
+                    --upgrade   List upgrade scripts to be done
+                    --downgrade List downgrade scripts to be done
+                    --history   List downgrade and upgrade already done
+                    --setup     List setup configuration values
        -u upgrade   Upgrade script's executions
        -d downgrade Downgrade script's executions
        -s setup     Setup current installation key/values with arguments and parameters
                     <key>     Key to setup
                     <value>   Value to setup
        -i install   Initialize setup configuration repository
+
 ```
 
 
@@ -53,9 +55,11 @@ usage: sqlserver-migrations ( [ -h | help ] | [ -l | list ] | [ -u | upgrade ] |
 
 ```bat
 C:\..\sqlserver-migrations\src\powershell> powershell -File sqlserver-migrations.ps1 install
-sqlserver-migrations - v.2020.05.17.0125 - SQLServer Database Management Tool for upgrades and downgrades scripts
+sqlserver-migrations - v.2020.05.22.1958 - SQLServer Database Management Tool for upgrades and downgrades scripts
 
 SUCCESS: sqlserver-migrations installed!
+         File '.sqlserver-migrations\config-key-value.csv' created.
+         File '.sqlserver-migrations\history.csv' created.
 
 ```
 
@@ -63,70 +67,156 @@ SUCCESS: sqlserver-migrations installed!
 
 ```bat
 C:\..\sqlserver-migrations\src\powershell> powershell -file sqlserver-migrations.ps1 list --setup
-sqlserver-migrations - v.2020.05.17.0125 - SQLServer Database Management Tool for upgrades and downgrades scripts
+sqlserver-migrations - v.2020.05.22.1958 - SQLServer Database Management Tool for upgrades and downgrades scripts
 
-key             value
---------------- --------------------------------------------------
-sqlcmdPath
-servername      localhost
-protocol        
+key                  value                                              obs
+-------------------- -------------------------------------------------- ------------------------
+sqlcmd-path
+servername           localhost
+protocol
 port
-login           user
-password        password123
-database        master
-prefixUpgrade   upgrade-
-prefixDowngrade downgrade-
+login                user
+password             password123
+database             master
+prefix-upgrade       upgrade-
+prefix-downgrade     downgrade-
+
 ```
 
-* Create your first upgrade script (.sql)
+* Change configurations setup key/values
 
 ```bat
-ECHO CREATE TABLE tmp_sqlserver_migrations_demo ( a int ) >  upgrade-demo-01.sql
+C:\..\sqlserver-migrations\src\powershell> powershell -file sqlserver-migrations.ps1 setup login sa
+sqlserver-migrations - v.2020.05.22.1958 - SQLServer Database Management Tool for upgrades and downgrades scripts
+
+SUCCESS: sqlserver-migrations (key/value) setup!
+         Try 'sqlserver-migrations list setup for more !'
+
+```
+
+* Create your **SQL** script `upgrade-demo-01.sql`
+
+```bat
+CREATE TABLE tmp_sqlserver_migrations_demo ( a int ) > upgrade-demo-01.sql
 ECHO GO >> upgrade-demo-01.sql
 ```
 
-* Create your second upgrade script (.sql)
+* Create your **SQL** script `upgrade-demo-02.sql`
 
 ```bat
-ECHO DROP TABLE tmp_sqlserver_migrations_demo >  upgrade-demo-02.sql
+ECHO DROP TABLE tmp_sqlserver_migrations_demo > upgrade-demo-02.sql
 ECHO GO >> upgrade-demo-02.sql
 ```
 
-* Upgrade your environment
-  * `sqlserver-migrations` runs all script prefixed with configuration `prefixUpgrade` order by name
+* Create your **BAT** script `upgrade-demo-03.bat`
 
 ```bat
-C:\..\sqlserver-migrations\src\powershell> powershell -file sqlserver-migrations.ps1 upgrade
-sqlserver-migrations - v.2020.05.17.0213 - SQLServer Database Management Tool for upgrades and downgrades scripts
+ECHO DATE /T > upgrade-demo-03.bat
+ECHO TIME /T >> upgrade-demo-03.bat
+```
+
+* Create your **SQL** script `downgrade-demo-01.sql`
+
+```bat
+ECHO SELECT CURRENT_TIMESTAMP > downgrade-demo-01.sql
+ECHO GO >> downgrade-demo-01.sql
+```
+
+* Create your **SQL** script `downgrade-demo-02.sql`
+
+```bat
+ECHO DROP TABLE tmp_tabela_que_nao_existe_vai_gerar_erro > downgrade-demo-02.sql
+ECHO GO >> downgrade-demo-02.sql
+```
+
+* Create your **SQL** script `downgrade-demo-03.sql`
+
+```bat
+ECHO DIR > downgrade-demo-03.sql
+```
+
+* List upgrade scripts for your environment
+  * List scripts that must be runned to upgrade environment
+  * `sqlserver-migrations` will run all scripts prefixed with configuration `prefixUpgrade` order by name
+
+```bat
+C:\..\sqlserver-migrations\src\powershell> powershell -file sqlserver-migrations.ps1 list --upgrade
+sqlserver-migrations - v.2020.05.22.1958 - SQLServer Database Management Tool for upgrades and downgrades scripts
+
+SQLCMD -S localhost -d master -U descaractdados -P descaractdados -e  -i upgrade-demo-01.sql -o upgrade-demo-01.log
+SQLCMD -S localhost -d master -U descaractdados -P descaractdados -e  -i upgrade-demo-02.sql -o upgrade-demo-02.log
+upgrade-demo-03.bat > upgrade-demo-03.log
+
 ```
 
 * Now, let's analyze, script's, repository
   * sub-folder `.sqlserver-migrations` was created by `sqlserver-migrations` for repository
   * file   `sqlserver-migrations.ps1` is powershell script
   * file   `.\sqlserver-migrations\config-key-value.csv` contains setup configuration information
-  * file(s) `upgrade-demo-01.sql` and `upgrade-demo-02.sql` are your upgrades scripts
-  * file(s) `upgrade-demo-01.log` and `upgrade-demo-02.log` in sub-folder `.sqlserver-migrations` were created by `sqlserver-migrations` during upgrade and will be always overwritten with contents of last execution
+  * file   `.\sqlserver-migrations\history.csv` contains history for executed scripts on environment
+  * file(s) `upgrade-demo-01.sql` and `upgrade-demo-02.sql` are **SQL** scripts and will be executed using `SQLCMD`
+  * file(s) `upgrade-demo-03.bat` is a **BAT** script and will be executed using `CMD.exe`
+  * let's take a look on current directory files
 
 ```bat
-C:\..\sqlserver-migrations\src\powershell> dir /s
-Pasta de C:\GitHome\ws-github-01\sqlserver-migrations\src\powershell
+C:\..\sqlserver-migrations\src\powershell> dir
+ O volume na unidade C é OS
+ O Número de Série do Volume é 8673-F822
 
-17/05/2020  02:24    <DIR>          .
-17/05/2020  02:24    <DIR>          ..
-17/05/2020  02:08    <DIR>          .sqlserver-migrations
-17/05/2020  02:16            13.534 sqlserver-migrations.ps1
-17/05/2020  02:24                60 upgrade-demo-01.sql
-17/05/2020  02:24                48 upgrade-demo-02.sql
-               3 arquivo(s)         13.642 bytes
+ Pasta de C:\GitHome\ws-github-01\sqlserver-migrations\src\powershell
 
-Pasta de C:\GitHome\ws-github-01\sqlserver-migrations\src\powershell\.sqlserver-migrations
+22/05/2020  20:00    <DIR>          .
+22/05/2020  20:00    <DIR>          ..
+22/05/2020  20:00    <DIR>          .sqlserver-migrations
+22/05/2020  20:12                32 downgrade-demo-01.sql
+22/05/2020  20:13                59 downgrade-demo-02.sql
+22/05/2020  19:23                55 downgrade-demo-03.bat
+22/05/2020  19:59            21.419 sqlserver-migrations.ps1
+22/05/2020  20:06                65 upgrade-demo-01.sql
+22/05/2020  20:06                48 upgrade-demo-02.sql
+22/05/2020  20:11                20 upgrade-demo-03.bat
+```
 
-17/05/2020  02:08    <DIR>          .
-17/05/2020  02:08    <DIR>          ..
-17/05/2020  02:20               402 config-key-value.csv
-17/05/2020  02:50               128 upgrade-demo-01.log
-17/05/2020  02:50               241 upgrade-demo-02.log
-               3 arquivo(s)            402 bytes
+* Upgrade your environment
+
+```bat
+C:\..\sqlserver-migrations\src\powershell> powershell -file sqlserver-migrations.ps1 upgrade
+sqlserver-migrations - v.2020.05.22.1958 - SQLServer Database Management Tool for upgrades and downgrades scripts
+
+SQLCMD -S localhost -d master -U descaractdados -P descaractdados -e  -i upgrade-demo-01.sql -o upgrade-demo-01.log
+CREATE TABLE tmp_sqlserver_migrations_demo ( a int )
+
+SQLCMD -S localhost -d master -U descaractdados -P descaractdados -e  -i upgrade-demo-02.sql -o upgrade-demo-02.log
+DROP TABLE tmp_sqlserver_migrations_demo
+
+upgrade-demo-03.bat > upgrade-demo-03.log
+
+C:\GitHome\ws-github-01\sqlserver-migrations\src\powershell>DATE /T
+22/05/2020
+
+C:\GitHome\ws-github-01\sqlserver-migrations\src\powershell>TIME /T
+20:27
+```
+
+* List upgrade scripts necessaries for upgrade your environment just after run another upgrade
+  * Nothing is necessary
+
+```bat
+C:\..\sqlserver-migrations\src\powershell> powershell -file sqlserver-migrations.ps1 list --upgrade
+sqlserver-migrations - v.2020.05.22.1958 - SQLServer Database Management Tool for upgrades and downgrades scripts
+```
+
+* List upgrade scripts history
+
+```bat
+C:\..\sqlserver-migrations\src\powershell> powershell -file sqlserver-migrations.ps1 list --history
+sqlserver-migrations - v.2020.05.22.1958 - SQLServer Database Management Tool for upgrades and downgrades scripts
+
+ScriptFilename                                     DateTime             Obs
+-------------------------------------------------- -------------------- ------------------------
+upgrade-demo-01.sql                                22/05/2020 20:27:43
+upgrade-demo-02.sql                                22/05/2020 20:27:44
+upgrade-demo-03.bat                                22/05/2020 20:27:44
 ```
 
 
