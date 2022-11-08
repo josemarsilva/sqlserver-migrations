@@ -210,19 +210,24 @@ Function Execute-Script ( $scriptName, $bList )
 
     # Script Command Line  ...
     $scriptCmd = ""
+	$scriptCmdLet = ""
     if ( $scriptFileType.ToLower() -eq ".sql" ) {
-        $scriptCmd = $sqlcmdPath + "SQLCMD -S " + $protocol + $servername + " -d " + $database + " -U " + $login + " -P " + $password + " -e " + " -i " + $scriptName + " -o " + $scriptLogFilename
+ 		$scriptCmdLet = 'Invoke-Sqlcmd -InputFile ' + $scriptName + ' -ServerInstance . -HostName ' + $servername + ' -Database ' + $database + ' -Username ' + $login + ' -Password ' +  $password  + ' -AbortOnError -OutputSqlErrors $True'
     } elseif ( $scriptFileType.ToLower() -eq ".bat" ) {
         $scriptCmd = $scriptName + " > " + $scriptLogFilename
     } else {
         $scriptCmd = "ECHO ERROR NOT implemented " + $scriptName
     }
     Write-Host ( $scriptCmd )
+    Write-Host ( $scriptCmdLet )
     if ( -not $bList ) {
-        cmd.exe /c ( $scriptCmd )
-        Get-Content -Path $scriptLogFilename
-        Add-Content ($configRepositoryPath + "\" + $historyFile) ( $scriptName + ";" + (Get-Date).ToString() + ";" )
-
+		if ( $scriptFileType.ToLower() -eq ".sql" ) {
+			Invoke-Sqlcmd -InputFile $scriptName -ServerInstance . -HostName $servername -Database $database -Username $login -Password $password -AbortOnError -OutputSqlErrors $True
+		} else {
+			cmd.exe /c ( $scriptCmd )
+			# Get-Content -Path $scriptLogFilename
+			# Add-Content ($configRepositoryPath + "\" + $historyFile) ( $scriptName + ";" + (Get-Date).ToString() + ";" )
+		}
     }
 
 }
@@ -367,7 +372,7 @@ Function Command-Install
     ( "prefix-upgrade"   + ";" + "upgrade-"    + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
     ( "prefix-downgrade" + ";" + "downgrade-"  + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
     # create installation file ($configRepositoryPath + "\" + $historyFile) ...
-    ( "ScriptFilename"              + ";" + "DateTime"       + ";" + "obs" + "\n" ) | Out-File         ($configRepositoryPath + "\" + $historyFile)
+    ( "ScriptFilename"              + ";" + "DateTime"       + ";" + "obs" + "" ) | Out-File         ($configRepositoryPath + "\" + $historyFile)
     Write-Host( "" )
     Write-Host( "SUCCESS: sqlserver-migrations installed!" )
 	Write-Host( "         File '.sqlserver-migrations\config-key-value.csv' created." )
