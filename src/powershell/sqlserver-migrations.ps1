@@ -14,7 +14,7 @@
 # #############################################################################
 # initializing ...
 # #############################################################################
-$release = "v.2020.05.22.1958"
+$release = "v.2022.11.24.1510"
 $argCmd = $args[0]
 $argCmdArg1 = $args[1]
 $argCmdArg2 = $args[2]
@@ -33,6 +33,7 @@ Write-Host( "sqlserver-migrations - $release - SQLServer Database Management Too
 # loading configuration (key,value) from (.csv) file sub-folder ...
 # #############################################################################
 $sqlcmdPath      = ""
+$serverinstance  = ""
 $servername      = ""
 $protocol        = ""
 $port            = ""
@@ -47,6 +48,7 @@ if ( Test-path ($configRepositoryPath + "\" + $configKeyValueCsvFile) ) {
     $objConfigKeyValue = Import-Csv ($configRepositoryPath + "\" + $configKeyValueCsvFile) -Delimiter ";"
     # loading (key,values) ...
     $sqlcmdPath      = ( $objConfigKeyValue | Where-Object key -eq "sqlcmd-path"       | Select-Object value )[0].value
+    $serverinstance  = ( $objConfigKeyValue | Where-Object key -eq "serverinstance"    | Select-Object value )[0].value
     $servername      = ( $objConfigKeyValue | Where-Object key -eq "servername"        | Select-Object value )[0].value
     $protocol        = ( $objConfigKeyValue | Where-Object key -eq "protocol"          | Select-Object value )[0].value
     $port            = ( $objConfigKeyValue | Where-Object key -eq "port"              | Select-Object value )[0].value
@@ -81,6 +83,7 @@ Function Command-Help
     Write-Host( "                    <key>     Key to setup" )
     Write-Host( "                    <value>   Value to setup" )
     Write-Host( "       -i install   Initialize setup configuration repository" )
+    Write-Host( "                    --force   (optional) Force install remove/create config" )
     Write-Host( "" )
 }
 
@@ -108,11 +111,11 @@ Function Check-Config
         exit 1 # error
     }
     # check configuration prefixUpgrade ...
-    if ($servername -eq "") {
+    if ($serverinstance -eq "" -and $servername -eq "") {
         Write-Host( "" )
-        Write-Host( "ERROR: sqlserver-migrations setup configuration key value 'servername' can *NOT* be empty!" )
+        Write-Host( "ERROR: sqlserver-migrations setup configuration key value [ 'serverinstance', 'servername' ] both values can *NOT* be empty!" )
 		Write-Host( "       Try 'sqlserver-migrations list --setup' " )
-		Write-Host( "       Try 'sqlserver-migrations setup servername <put-value-here>' " )
+		Write-Host( "       Try 'sqlserver-migrations setup serverinstance <put-value-here>' " )
         Write-Host( "" )
         exit 1 # error
     } elseif  ($login -eq "") {
@@ -212,7 +215,7 @@ Function Execute-Script ( $scriptName, $bList )
     $scriptCmd = ""
 	$scriptCmdLet = ""
     if ( $scriptFileType.ToLower() -eq ".sql" ) {
- 		$scriptCmdLet = 'Invoke-Sqlcmd -InputFile ' + $scriptName + ' -ServerInstance . -HostName ' + $servername + ' -Database ' + $database + ' -Username ' + $login + ' -Password ' +  $password  + ' -AbortOnError -OutputSqlErrors $True'
+ 		$scriptCmdLet = 'Invoke-Sqlcmd -InputFile ' + $scriptName + ' -ServerInstance ' + $serverinstance + ' -HostName ' + $servername + ' -Database ' + $database + ' -Username ' + $login + ' -Password ' +  '********'  + ' -AbortOnError -OutputSqlErrors $True'
     } elseif ( $scriptFileType.ToLower() -eq ".bat" ) {
         $scriptCmd = $scriptName + " > " + $scriptLogFilename
     } else {
@@ -222,7 +225,8 @@ Function Execute-Script ( $scriptName, $bList )
     Write-Host ( $scriptCmdLet )
     if ( -not $bList ) {
 		if ( $scriptFileType.ToLower() -eq ".sql" ) {
-			Invoke-Sqlcmd -InputFile $scriptName -ServerInstance . -HostName $servername -Database $database -Username $login -Password $password -AbortOnError -OutputSqlErrors $True
+			# Invoke-Sqlcmd
+			Invoke-Sqlcmd -InputFile $scriptName -ServerInstance $serverinstance -HostName $servername -Database $database -Username $login -Password $password -AbortOnError -OutputSqlErrors $True
 		} else {
 			cmd.exe /c ( $scriptCmd )
 			# Get-Content -Path $scriptLogFilename
@@ -284,6 +288,8 @@ Function Command-Setup
         # get correspondent key/value ...
         if ( $argCmdArg1.ToLower() -eq "sqlcmd-path" ) {
             $sqlcmdPath      = $argCmdArg2
+        } elseif ( $argCmdArg1.ToLower() -eq "serverinstance" ) {
+            $serverinstance  = $argCmdArg2
         } elseif ( $argCmdArg1.ToLower() -eq "servername" ) {
             $servername      = $argCmdArg2
         } elseif ( $argCmdArg1.ToLower() -eq "protocol" ) {
@@ -310,6 +316,7 @@ Function Command-Setup
         # write back configuration ...
         ( "key"              + ";" + "value"          + ";" + "obs" ) | Out-File         ($configRepositoryPath + "\" + $configKeyValueCsvFile)
         ( "sqlcmd-Path"      + ";" + $sqlcmdPath      + ";" + ""    ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+        ( "serverinstance"   + ";" + $serverinstance  + ";" + ""    ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
         ( "servername"       + ";" + $servername      + ";" + ""    ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
         ( "protocol"         + ";" + $protocol        + ";" + ""    ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
         ( "port"             + ";" + $port            + ";" + ""    ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
@@ -338,8 +345,13 @@ Function Command-Setup
 # #############################################################################
 Function Command-Install
 {
+	$installforce = $False
+    # check command arguments ...
+    if ($argCmdArg1.ToLower() -eq "--force") {
+		$installforce = $True
+	}
     # check configuration sub-folder and file ($configRepositoryPath + "\" + $configKeyValueCsvFile) ...
-    if ( Test-path ($configRepositoryPath + "\" + $configKeyValueCsvFile) -PathType Leaf ) {
+    if ( (Test-path ($configRepositoryPath + "\" + $configKeyValueCsvFile) -PathType Leaf) -and -not $installforce ) {
         Write-Host( "" )
         Write-Host( "ERROR: sqlserver-migrations IS ALREADY installed!" )
 		Write-Host( "       File '" + ($configRepositoryPath + "\" + $configKeyValueCsvFile) + "' is present! " )
@@ -348,7 +360,7 @@ Function Command-Install
         exit 1 # error
     }
     # check configuration sub-folder and file ($configRepositoryPath + "\" + $historyFile) ...
-    if ( Test-path ($configRepositoryPath + "\" + $historyFile) -PathType Leaf ) {
+    if ( (Test-path ($configRepositoryPath + "\" + $historyFile) -PathType Leaf)  -and -not $installforce ) {
         Write-Host( "" )
         Write-Host( "ERROR: sqlserver-migrations IS ALREADY installed!" )
 		Write-Host( "       File '" + ($configRepositoryPath + "\" + $historyFile) + "' is present! " )
@@ -363,7 +375,8 @@ Function Command-Install
     # create installation file ($configRepositoryPath + "\" + $configKeyValueCsvFile) ...
     ( "key"              + ";" + "value"       + ";" + "obs") | Out-File         ($configRepositoryPath + "\" + $configKeyValueCsvFile)
     ( "sqlcmd-path"      + ";" + ""            + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
-    ( "servername"       + ";" + "localhost"   + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+    ( "serverinstance"   + ";" + ""            + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+    ( "servername"       + ";" + "127.0.0.1"   + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
     ( "protocol"         + ";" + ""            + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
     ( "port"             + ";" + ""            + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
     ( "login"            + ";" + "user"        + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
@@ -371,6 +384,7 @@ Function Command-Install
     ( "database"         + ";" + "master"      + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
     ( "prefix-upgrade"   + ";" + "upgrade-"    + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
     ( "prefix-downgrade" + ";" + "downgrade-"  + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
+    ( "release"          + ";" + $release      + ";" + ""   ) | Out-File -Append ($configRepositoryPath + "\" + $configKeyValueCsvFile)
     # create installation file ($configRepositoryPath + "\" + $historyFile) ...
     ( "ScriptFilename"              + ";" + "DateTime"       + ";" + "obs" + "" ) | Out-File         ($configRepositoryPath + "\" + $historyFile)
     Write-Host( "" )
